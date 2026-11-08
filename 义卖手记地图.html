@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- 移动端适配：禁止缩放，宽度跟随设备 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<title>康园星途 · 流动义卖地图</title>
+<!-- 手写风格字体（站酷快乐体，加载失败会自动回退到系统字体，不影响使用） -->
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   全局样式（手绘风 · 纸质 · 公益暖色系）
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --ink: #5b4a3a;            /* 手绘墨色（正文） */
+  --ink-light: #a08c76;      /* 淡墨（次要文字） */
+  --paper: #fdf8ee;          /* 纸张底色 */
+  --paper-deep: #f6eddd;     /* 深一点的纸色 */
+  --accent: #e8874d;         /* 主色：暖橙 */
+  --accent-soft: #fdeedd;    /* 暖橙浅底 */
+  --green: #8bbf9f;          /* 已完成义卖 */
+  --green-soft: #e9f5ec;
+  --blue: #85aecf;           /* 即将到访 */
+  --blue-soft: #e8f1f8;
+  --line: #d8c9b4;           /* 手绘线条色 */
+
+  /* 手写体字体栈 */
+  --font-hand: "ZCOOL KuaiLe", "Yuanti SC", "YouYuan", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  /* 纸张质感：淡淡的横纹 + 米色底 */
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 27px, rgba(190, 165, 130, 0.07) 28px);
+  font-family: var(--font-hand);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 手绘不规则圆角（核心技巧）：四角歪歪扭扭，像用马克笔画的框 */
+
+/* ============================================================
+   顶部标题区（像地图扉页的手写标题）
+   ============================================================ */
+.header {
+  padding: 26px 20px 6px;
+  text-align: center;
+  position: relative;
+}
+.header h1 {
+  font-size: 23px;
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  color: var(--ink);
+}
+.header h1 .star { color: var(--accent); margin: 0 6px; font-size: 16px; vertical-align: 2px; }
+/* 手绘波浪下划线（SVG背景平铺） */
+.header .underline {
+  display: block;
+  width: 200px; height: 10px;
+  margin: 4px auto 0;
+}
+.header p.intro {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--ink-light);
+  padding: 0 14px;
+}
+/* 导语里的手绘高亮笔效果 */
+.header p.intro em {
+  font-style: normal;
+  background: linear-gradient(transparent 62%, rgba(232,135,77,0.28) 62%);
+  padding: 0 2px;
+}
+
+/* ============================================================
+   地图区域（手绘藏宝图风）
+   ============================================================ */
+.map-wrap {
+  position: relative;
+  margin: 14px 12px 20px;
+  border-radius: 18px 6px 20px 6px / 6px 20px 6px 18px;  /* 歪斜相框 */
+  border: 2.5px solid var(--ink);
+  box-shadow: 3px 4px 0 rgba(91, 74, 58, 0.14);          /* 偏移实心阴影，手绘感 */
+  overflow: hidden;
+  background: #faf3e3;
+}
+.map-wrap svg { display: block; width: 100%; height: auto; }
+
+/* 胶带装饰：贴在地图左上/右上角，像手工拼贴 */
+.tape {
+  position: absolute;
+  width: 74px; height: 24px;
+  background: rgba(232, 190, 130, 0.5);
+  border-left: 1px dashed rgba(255,255,255,0.7);
+  border-right: 1px dashed rgba(255,255,255,0.7);
+  z-index: 6;
+  pointer-events: none;
+}
+.tape.tl { top: -10px; left: 26px;  transform: rotate(-8deg); }
+.tape.tr { top: -10px; right: 26px; transform: rotate(6deg);  }
+
+/* ---- 点位标记：手绘大头针 ---- */
+.marker {
+  position: absolute;
+  width: 46px; height: 58px;
+  margin: -56px 0 0 -23px;   /* 锚点在针脚底部 */
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 3;
+  transition: transform 0.15s ease;
+}
+.marker:active { transform: scale(1.1) rotate(-3deg); }
+
+/* 针头：不规则圆 + 白描边，像蜡笔画的小太阳 */
+.marker .pin {
+  width: 26px; height: 26px;
+  border-radius: 48% 52% 55% 45% / 52% 48% 52% 48%;
+  border: 2.5px solid #fff;
+  box-shadow: 0 3px 6px rgba(91,74,58,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  position: relative;
+  z-index: 2;
+}
+.marker.done .pin { background: var(--green); }
+.marker.soon  .pin { background: var(--blue); }
+/* 即将到访：轻轻摇晃，提醒"我快来了" */
+.marker.soon .pin { animation: wiggle 2.4s ease-in-out infinite; }
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-7deg); }
+  75%      { transform: rotate(7deg); }
+}
+
+/* 针脚：小三角 */
+.marker .pin-foot {
+  width: 0; height: 0;
+  margin-top: -4px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 9px solid #fff;
+  filter: drop-shadow(0 2px 1px rgba(91,74,58,0.2));
+  z-index: 1;
+}
+.marker.done .pin-foot { border-top-color: var(--green); }
+.marker.soon  .pin-foot { border-top-color: var(--blue); }
+
+/* 名牌：小纸条样式 */
+.marker .label {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 9px;
+  color: #fff;
+  white-space: nowrap;
+  border-radius: 40px 8px 42px 8px / 8px 42px 8px 40px;
+  z-index: 2;
+  box-shadow: 1px 2px 0 rgba(91,74,58,0.15);
+}
+.marker.done .label  { background: var(--green); }
+.marker.soon  .label { background: var(--blue); }
+
+/* 图例：手绘小纸片 */
+.legend {
+  position: absolute;
+  left: 10px; bottom: 10px;
+  background: rgba(253, 248, 238, 0.95);
+  border: 1.5px solid var(--ink);
+  border-radius: 40px 8px 42px 8px / 8px 42px 8px 40px;
+  padding: 7px 12px;
+  font-size: 11px;
+  display: flex;
+  gap: 12px;
+  box-shadow: 2px 2px 0 rgba(91,74,58,0.12);
+  z-index: 5;
+}
+.legend span { display: flex; align-items: center; gap: 5px; color: var(--ink-light); }
+.legend i {
+  width: 11px; height: 11px;
+  border-radius: 48% 52% 55% 45% / 52% 48% 52% 48%;
+  border: 1.5px solid #fff;
+  display: inline-block;
+}
+.legend .i-done { background: var(--green); }
+.legend .i-soon { background: var(--blue); }
+
+/* ============================================================
+   点位详情弹窗（像翻开的一张信纸）
+   ============================================================ */
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(80, 62, 42, 0.4);
+  z-index: 90;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.mask.show { display: block; opacity: 1; }
+
+.panel {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  max-height: 84vh;
+  background: var(--paper);
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 27px, rgba(190, 165, 130, 0.07) 28px);
+  border-radius: 24px 24px 0 0;
+  border-top: 2.5px solid var(--ink);
+  z-index: 100;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 18px calc(26px + env(safe-area-inset-bottom));
+}
+.panel.show { transform: translateY(0); }
+
+.panel-head {
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  padding: 10px 0 12px;
+  z-index: 2;
+}
+.panel-head .grip {
+  width: 44px; height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  margin: 0 auto;
+}
+.panel-head .close-btn {
+  position: absolute;
+  right: 0; top: 14px;
+  width: 32px; height: 32px;
+  border: 2px solid var(--ink);
+  border-radius: 55% 45% 50% 50% / 48% 52% 48% 52%;  /* 手绘小圆 */
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 28px;
+  text-align: center;
+  box-shadow: 1.5px 1.5px 0 rgba(91,74,58,0.2);
+}
+
+/* 点位名称与日期 */
+.panel-title { text-align: center; margin-top: 4px; }
+.panel-title h2 { font-size: 20px; font-weight: 400; letter-spacing: 1px; }
+.panel-title .date {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--ink-light);
+}
+.status-tag {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 11.5px;
+  padding: 4px 16px;
+  border-radius: 40px 8px 42px 8px / 8px 42px 8px 40px;
+  border: 1.5px solid;
+}
+.status-tag.soon { background: var(--blue-soft); color: #4f7ba0; border-color: var(--blue); }
+.status-tag.done { background: var(--green-soft); color: #5c8f70; border-color: var(--green); }
+
+/* 板块卡片：手绘涂鸦框 */
+.section {
+  background: #fffdf7;
+  border: 2px solid var(--ink);
+  border-radius: 16px 5px 18px 5px / 5px 18px 5px 16px;
+  box-shadow: 2px 3px 0 rgba(91, 74, 58, 0.12);
+  padding: 14px;
+  margin-top: 16px;
+}
+.section h3 {
+  font-size: 15px;
+  font-weight: 400;
+  margin-bottom: 10px;
+  display: inline-block;
+  background: linear-gradient(transparent 60%, rgba(232,190,130,0.5) 60%); /* 荧光笔划线 */
+  padding: 0 3px;
+}
+
+/* 特色产品 */
+.product {
+  display: flex;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1.5px dashed var(--line);  /* 手绘虚线分隔 */
+}
+.product:last-of-type { border-bottom: none; padding-bottom: 0; }
+.product:first-of-type { padding-top: 0; }
+.product img {
+  width: 88px; height: 88px;
+  border-radius: 14px 4px 14px 4px / 4px 14px 4px 14px;
+  border: 2px solid var(--ink);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--paper-deep);
+  transform: rotate(-1.5deg);           /* 贴纸微倾斜 */
+}
+.product .p-info { flex: 1; min-width: 0; padding-top: 3px; }
+.product .p-name { font-size: 14.5px; }
+.product .p-desc { font-size: 12px; color: var(--ink-light); line-height: 1.7; margin-top: 4px; }
+
+/* AR 小卡提示条（手绘邮票风二维码） */
+.ar-tip {
+  margin-top: 13px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--accent-soft);
+  border: 1.5px dashed var(--accent);
+  border-radius: 12px 4px 12px 4px / 4px 12px 4px 12px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: #b06a3a;
+  line-height: 1.6;
+}
+.ar-tip .qr {
+  width: 48px; height: 48px;
+  border-radius: 4px;
+  border: 1.5px solid var(--accent);
+  flex-shrink: 0;
+  background: #fff;
+  object-fit: cover;
+  padding: 2px;
+}
+/* 无二维码图时的小图标框 */
+.ar-tip .qr-empty {
+  width: 48px; height: 48px;
+  border-radius: 4px;
+  border: 1.5px dashed var(--accent);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+
+/* 义卖数据：手绘账本格子 */
+.data-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.data-box {
+  flex: 1;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 30px 6px 30px 6px / 6px 30px 6px 30px;
+  padding: 13px 8px 11px;
+  text-align: center;
+}
+.data-box .num {
+  font-size: 21px;
+  color: var(--accent);
+}
+.data-box .num small { font-size: 12px; margin-left: 2px; }
+.data-box .cap { font-size: 11px; color: var(--ink-light); margin-top: 4px; }
+.data-note {
+  font-size: 11.5px;
+  color: var(--ink-light);
+  background: var(--paper-deep);
+  border-radius: 10px 3px 10px 3px / 3px 10px 3px 10px;
+  padding: 9px 11px;
+  line-height: 1.7;
+}
+.data-note + .data-note { margin-top: 8px; }
+
+/* 活动小结：手写日记感 */
+.summary {
+  font-size: 13px;
+  line-height: 2;
+  color: var(--ink);
+}
+/* 小结文字下的手绘波浪线（装饰） */
+.summary-line {
+  margin-top: 10px;
+  width: 120px; height: 8px;
+}
+
+/* 关闭按钮 */
+.panel-close {
+  display: block;
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 60px 14px 60px 14px / 14px 60px 14px 60px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-family: var(--font-hand);
+  box-shadow: 2px 3px 0 rgba(91,74,58,0.25);
+  letter-spacing: 2px;
+}
+.panel-close:active { transform: translate(1px, 2px); box-shadow: 1px 1px 0 rgba(91,74,58,0.25); }
+</style>
+</head>
+<body>
+
+<!-- ===================== 顶部标题 ===================== -->
+<header class="header">
+  <h1><span class="star">✦</span>康园星途 · 流动义卖地图<span class="star">✦</span></h1>
+  <!-- 手绘波浪下划线 -->
+  <svg class="underline" viewBox="0 0 200 10" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 2 6 Q 20 1, 40 5 T 80 5 T 120 5 T 160 5 T 198 4"
+          fill="none" stroke="#e8874d" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <p class="intro">康园流动义卖车奔赴不同点位，<em>售卖学员手作</em>，<br>记录每一场义卖的作品与收获</p>
+</header>
+
+<!-- ===================== 地图区域 ===================== -->
+<div class="map-wrap" id="mapWrap">
+  <!-- 手工胶带装饰 -->
+  <div class="tape tl"></div>
+  <div class="tape tr"></div>
+
+  <!--
+    地图底图：内置手绘风 SVG 示意图（无定位、无外部地图API）。
+    如需更换为真实手绘地图扫描图，把整个 <svg>...</svg> 换成
+    <img src="你的手绘地图.jpg" style="display:block;width:100%"> 即可，
+    点位坐标（percentage）按新图重新调整。
+  -->
+  <svg viewBox="0 0 375 480" xmlns="http://www.w3.org/2000/svg">
+    <!-- ====== 纸张底色 ====== -->
+    <rect width="375" height="480" fill="#faf3e3"/>
+
+    <!-- ====== 河流（手绘双线 + 波浪） ====== -->
+    <path d="M -10 385 C 70 350, 140 425, 235 378 C 310 342, 370 350, 390 372"
+          fill="none" stroke="#9ec4dd" stroke-width="16" stroke-linecap="round" opacity="0.55"/>
+    <path d="M -10 385 C 70 350, 140 425, 235 378 C 310 342, 370 350, 390 372"
+          fill="none" stroke="#7fb0d3" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- 河里的手绘波浪 -->
+    <path d="M 60 375 q 8 -6 16 0 M 150 400 q 8 -6 16 0 M 280 362 q 8 -6 16 0"
+          fill="none" stroke="#7fb0d3" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- ====== 道路（歪歪扭扭的手绘线） ====== -->
+    <path d="M -5 118 C 90 108, 200 122, 380 96"
+          fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round"/>
+    <path d="M -5 118 C 90 108, 200 122, 380 96"
+          fill="none" stroke="#d8c9b4" stroke-width="2.5" stroke-dasharray="1 10" stroke-linecap="round"/>
+    <path d="M 62 -5 C 70 150, 58 320, 72 485"
+          fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round"/>
+    <path d="M 62 -5 C 70 150, 58 320, 72 485"
+          fill="none" stroke="#d8c9b4" stroke-width="2.5" stroke-dasharray="1 10" stroke-linecap="round"/>
+    <path d="M -5 262 C 110 245, 240 292, 380 252"
+          fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+    <path d="M -5 262 C 110 245, 240 292, 380 252"
+          fill="none" stroke="#d8c9b4" stroke-width="2.5" stroke-dasharray="1 10" stroke-linecap="round"/>
+    <path d="M 285 -5 C 295 160, 280 330, 300 485"
+          fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round"/>
+    <path d="M 285 -5 C 295 160, 280 330, 300 485"
+          fill="none" stroke="#d8c9b4" stroke-width="2.5" stroke-dasharray="1 10" stroke-linecap="round"/>
+
+    <!-- ====== 街区（手绘歪斜小房子群） ====== -->
+    <!-- 左上街区 -->
+    <g stroke="#5b4a3a" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="24" y="26" width="24" height="20" rx="3" fill="#f3e2c8" transform="rotate(-2 36 36)"/>
+      <rect x="56" y="34" width="18" height="16" rx="3" fill="#ecd9bd" transform="rotate(2 65 42)"/>
+      <path d="M 22 26 l 14 -9 l 14 9" fill="#e0b98d" transform="rotate(-2 36 22)"/>
+    </g>
+    <!-- 中上街区：几间小屋 -->
+    <g stroke="#5b4a3a" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="120" y="26" width="22" height="18" rx="3" fill="#f3e2c8" transform="rotate(1 131 35)"/>
+      <path d="M 118 27 l 13 -9 l 13 9" fill="#e0b98d" transform="rotate(1 131 24)"/>
+      <rect x="156" y="30" width="18" height="16" rx="3" fill="#ecd9bd" transform="rotate(-2 165 38)"/>
+      <rect x="185" y="24" width="24" height="18" rx="3" fill="#f3e2c8" transform="rotate(2 197 33)"/>
+    </g>
+    <!-- 中央市场：带旗帜的小房子 -->
+    <g stroke="#5b4a3a" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="140" y="150" width="52" height="34" rx="4" fill="#f7d9b8" transform="rotate(-1 166 167)"/>
+      <path d="M 136 152 L 166 132 L 196 152 Z" fill="#e8874d" transform="rotate(-1 166 145)"/>
+      <rect x="160" y="168" width="12" height="16" rx="2" fill="#a5714a"/>
+      <line x1="192" y1="128" x2="192" y2="112" stroke-width="2"/>
+      <path d="M 192 112 l 14 4 l -14 4 Z" fill="#8bbf9f"/>
+    </g>
+    <!-- 右侧街区 -->
+    <g stroke="#5b4a3a" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="300" y="128" width="22" height="18" rx="3" fill="#ecd9bd" transform="rotate(-2 311 137)"/>
+      <rect x="316" y="152" width="24" height="18" rx="3" fill="#f3e2c8" transform="rotate(1 328 161)"/>
+    </g>
+    <!-- 左下街区 -->
+    <g stroke="#5b4a3a" stroke-width="1.8" stroke-linejoin="round">
+      <rect x="26" y="296" width="26" height="20" rx="3" fill="#f3e2c8" transform="rotate(1.5 39 306)"/>
+      <rect x="62" y="304" width="18" height="16" rx="3" fill="#ecd9bd" transform="rotate(-1 71 312)"/>
+    </g>
+
+    <!-- ====== 公园（手绘小树林） ====== -->
+    <ellipse cx="292" cy="300" rx="52" ry="36" fill="#e4eeda" opacity="0.9"/>
+    <g stroke="#5b4a3a" stroke-width="1.6" stroke-linejoin="round">
+      <circle cx="278" cy="292" r="11" fill="#a9cf9e"/>
+      <line x1="278" y1="303" x2="278" y2="310"/>
+      <circle cx="300" cy="308" r="9" fill="#c0ddb4"/>
+      <line x1="300" y1="317" x2="300" y2="322"/>
+      <circle cx="312" cy="288" r="8" fill="#a9cf9e"/>
+    </g>
+
+    <!-- ====== 散落的小树装饰 ====== -->
+    <g stroke="#5b4a3a" stroke-width="1.5" stroke-linejoin="round">
+      <circle cx="42" cy="228" r="8" fill="#b6d6a8"/>
+      <line x1="42" y1="236" x2="42" y2="242"/>
+      <circle cx="212" cy="424" r="8" fill="#b6d6a8"/>
+      <line x1="212" y1="432" x2="212" y2="438"/>
+      <circle cx="342" cy="196" r="7" fill="#c0ddb4"/>
+      <line x1="342" y1="203" x2="342" y2="208"/>
+      <circle cx="106" cy="70" r="7" fill="#b6d6a8"/>
+      <line x1="106" y1="77" x2="106" y2="82"/>
+    </g>
+
+    <!-- ====== 手绘云朵 ====== -->
+    <g fill="#ffffff" opacity="0.85">
+      <path d="M 296 42 q 6 -14 20 -10 q 4 -10 16 -6 q 12 -6 16 6 q 12 2 6 12 q -20 6 -58 -2 Z"/>
+      <path d="M 36 448 q 5 -11 16 -8 q 4 -8 13 -4 q 9 -5 12 5 q 9 2 4 9 q -16 5 -45 -2 Z"/>
+    </g>
+    <g fill="none" stroke="#d8c9b4" stroke-width="1.5" stroke-linecap="round">
+      <path d="M 296 42 q 6 -14 20 -10 q 4 -10 16 -6 q 12 -6 16 6 q 12 2 6 12 q -20 6 -58 -2 Z"/>
+      <path d="M 36 448 q 5 -11 16 -8 q 4 -8 13 -4 q 9 -5 12 5 q 9 2 4 9 q -16 5 -45 -2 Z"/>
+    </g>
+
+    <!-- ====== 指南针（右上角手绘风） ====== -->
+    <g transform="translate(338, 44)" stroke="#5b4a3a" fill="none" stroke-width="1.8" stroke-linecap="round">
+      <circle r="15" fill="#fdf8ee"/>
+      <path d="M 0 -11 L 4 3 L 0 0 L -4 3 Z" fill="#e8874d" stroke-width="1.2"/>
+      <text x="0" y="-17.5" text-anchor="middle" font-size="9" fill="#5b4a3a" stroke="none"
+            font-family="inherit">N</text>
+    </g>
+
+    <!-- ====== 虚线路线：串起各点位（星途的"路"） ====== -->
+    <path d="M 112 200 C 140 150, 170 130, 187 120 C 205 132, 240 250, 255 292"
+          fill="none" stroke="#e8874d" stroke-width="2.5" stroke-dasharray="6 7" stroke-linecap="round" opacity="0.75"/>
+
+    <!-- ====== 左上角地图标题小牌 ====== -->
+    <g transform="rotate(-3 100 32)">
+      <rect x="38" y="15" width="124" height="34" rx="7" fill="#fdf8ee" stroke="#5b4a3a" stroke-width="1.8"/>
+      <!-- textLength 强制文字宽度不超过 106，保证任何字体下都不会溢出牌子 -->
+      <text x="100" y="38" text-anchor="middle" font-size="14" fill="#5b4a3a"
+            font-family="inherit" textLength="106" lengthAdjust="spacingAndGlyphs">义卖手记 · 地图</text>
+    </g>
+  </svg>
+
+  <!-- 点位标记由 JS 动态插入 -->
+  <div id="markerLayer"></div>
+
+  <!-- 图例 -->
+  <div class="legend">
+    <span><i class="i-soon"></i>即将到访</span>
+    <span><i class="i-done"></i>已完成义卖</span>
+  </div>
+</div>
+
+<!-- ===================== 点位详情弹窗 ===================== -->
+<div class="mask" id="mask"></div>
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <div class="grip"></div>
+    <button class="close-btn" id="btnCloseX" aria-label="关闭">✕</button>
+  </div>
+  <!-- 弹窗内容由 JS 动态填充 -->
+  <div id="panelBody"></div>
+  <button class="panel-close" id="btnClose">合 上 这 页 ✦</button>
+</div>
+
+<script>
+/* ============================================================
+   ★★★★★★★★★★★★★  内容维护区（重点）  ★★★★★★★★★★★★★
+
+   所有后期修改都在这里完成，不需要碰其他代码。
+
+   ----------------------------------------------------------
+   一、在哪里新增 / 删除地图点位？
+       直接在下面的 POINTS 数组中添加或删除一个 { ... } 对象。
+
+   二、在哪里修改产品介绍、营业额、图片？
+       都在对应点位的 products / revenue / sold / summary 字段里。
+
+   ----------------------------------------------------------
+   【字段说明】
+   name     点位名称（地图名牌 + 弹窗标题）
+   date     义卖举办日期
+   status   "done" = 已完成义卖（绿色大头针）
+            "soon" = 即将到访（蓝色大头针，轻轻摇晃）
+   x / y    点位在地图上的位置，百分比（0~100），
+            对应底图 左边距 / 上边距，保存后预览微调
+   products 特色产品数组：img（图片地址）/ name / desc
+   qrImg    AR 小卡二维码图片地址（留空则显示占位图标）
+   qrText   AR 小卡文字说明
+   revenue  本场总营业额（数字，元）
+   sold     售出作品数量（数字）
+   summary  本场活动小结（纯文字，随手改）
+   ============================================================ */
+
+const POINTS = [
+  {
+    name: "东湖文化广场",
+    date: "2026年10月18日",
+    status: "done",          // 已完成义卖
+    x: 30, y: 42,            // 地图位置（百分比，微调用）
+    products: [
+      {
+        img: "https://via.placeholder.com/200x200/F5D8BC/8a5a2e?text=醒狮头",  // ← 换成真实产品图片地址
+        name: "迷你醒狮头",
+        desc: "学员历时两周制作的传统醒狮头，绒毛与彩绘均出自学员之手，寓意吉祥纳福。"
+      },
+      {
+        img: "https://via.placeholder.com/200x200/D9E6D2/5a7a4a?text=编织挂件",
+        name: "手编平安挂件",
+        desc: "彩色棉绳手工编织，可挂在包上或车内，每一款纹样都独一无二。"
+      }
+    ],
+    qrImg: "https://via.placeholder.com/100x100/ffffff/888888?text=AR",  // ← 换成 AR 小卡二维码图片
+    qrText: "扫描左侧二维码，观看醒狮头的 AR 展示，了解学员创作背后的故事",
+    revenue: 1286,           // 本场总营业额（元）
+    sold: 34,                // 售出作品数量
+    summary: "当天秋高气爽，路过居民驻足热情，醒狮头开场半小时即售出。学员小雨第一次独立完成收银，收获满满成就感。营收将全部用于下一批手作材料采购。"   // ← 活动小结，随手改
+  },
+  {
+    name: "老城步行街",
+    date: "2026年11月15日",
+    status: "done",
+    x: 68, y: 61,
+    products: [
+      {
+        img: "https://via.placeholder.com/200x200/F2DCD0/9a6a52?text=黏土花束",
+        name: "黏土小花束",
+        desc: "超轻黏土捏制的永生花束，不会凋谢的浪漫，多款配色可选。"
+      }
+    ],
+    qrImg: "",
+    qrText: "扫描 AR 小卡二维码，查看花束制作过程的定格动画",
+    revenue: 964,
+    sold: 27,
+    summary: "步行街人流密集，黏土花束最受年轻朋友欢迎。义卖车首次尝试扫码讲解产品故事，反响很好。"
+  },
+  {
+    name: "滨江公园北门",
+    date: "2026年11月22日",
+    status: "soon",          // 即将到访
+    x: 50, y: 25,
+    products: [
+      {
+        img: "https://via.placeholder.com/200x200/D6DFEC/5a7090?text=新品预告",
+        name: "冬日暖手编织品（新品）",
+        desc: "学员正在赶制的毛线暖手物，本周新品，欢迎到现场选购支持。"
+      }
+    ],
+    qrImg: "",
+    qrText: "AR 小卡将在活动结束后上传",
+    revenue: 0,              // 未开始，先填 0
+    sold: 0,
+    summary: "筹备中：本周学员们正在加紧制作新品，欢迎届时来滨江公园北门找我们玩！"
+  }
+  /* ← 需要新增点位时，照上面的格式，在这里加一个 { ... , } 即可 */
+];
+
+/* ============================================================
+   以下为渲染逻辑，一般不需要修改
+   ============================================================ */
+
+// 1. 生成地图点位标记（大头针 + 名牌）
+const markerLayer = document.getElementById("markerLayer");
+const PIN_ICON = { done: "🧶", soon: "🚐" };  // 针头小图标：已完成🧶 / 即将到访🚐（可改成其他 emoji）
+
+POINTS.forEach((p, i) => {
+  const el = document.createElement("div");
+  el.className = "marker " + (p.status === "done" ? "done" : "soon");
+  el.style.left = p.x + "%";
+  el.style.top  = p.y + "%";
+  el.innerHTML =
+    `<span class="pin">${PIN_ICON[p.status]}</span>` +
+    `<span class="pin-foot"></span>` +
+    `<span class="label">${p.name}</span>`;
+  el.addEventListener("click", () => openPanel(i));
+  markerLayer.appendChild(el);
+});
+
+// 2. 打开点位详情弹窗
+const mask  = document.getElementById("mask");
+const panel = document.getElementById("panel");
+const body  = document.getElementById("panelBody");
+
+function fmt(n) { return n.toLocaleString("zh-CN"); }
+
+function openPanel(i) {
+  const p = POINTS[i];
+  const isDone = p.status === "done";
+
+  // 产品卡片 HTML
+  const productsHtml = p.products.map(pr => `
+    <div class="product">
+      <img src="${pr.img}" alt="${pr.name}">
+      <div class="p-info">
+        <div class="p-name">${pr.name}</div>
+        <div class="p-desc">${pr.desc}</div>
+      </div>
+    </div>`).join("");
+
+  // AR 小卡提示（有二维码图显示图片，否则显示占位小框）
+  const qrHtml = p.qrImg
+    ? `<img class="qr" src="${p.qrImg}" alt="AR二维码">`
+    : `<div class="qr-empty">✨</div>`;
+
+  // 数据板块：已完成显示账本格子；即将到访显示预告
+  const dataSection = isDone ? `
+    <div class="section">
+      <h3>📊 本场义卖数据</h3>
+      <div class="data-row">
+        <div class="data-box">
+          <div class="num"><small>¥</small>${fmt(p.revenue)}</div>
+          <div class="cap">本场总营业额</div>
+        </div>
+        <div class="data-box">
+          <div class="num">${fmt(p.sold)}<small>件</small></div>
+          <div class="cap">售出作品数量</div>
+        </div>
+      </div>
+      <div class="data-note">💡 营收用途：全部用于康园学员手作材料采购</div>
+    </div>` : `
+    <div class="section">
+      <h3>📊 本场义卖数据</h3>
+      <div class="data-note" style="text-align:center;">本场义卖尚未开始，数据将在活动结束后更新，敬请期待 🌟</div>
+      <div class="data-note">💡 营收用途：全部用于康园学员手作材料采购</div>
+    </div>`;
+
+  body.innerHTML = `
+    <div class="panel-title">
+      <h2>${p.name}</h2>
+      <div class="date">📅 ${p.date}</div>
+      <span class="status-tag ${p.status}">${isDone ? "已完成义卖" : "即将到访"}</span>
+    </div>
+    <div class="section">
+      <h3>✨ 本场特色产品</h3>
+      ${productsHtml}
+      <div class="ar-tip">${qrHtml}<span>${p.qrText}</span></div>
+    </div>
+    ${dataSection}
+    <div class="section">
+      <h3>📝 本场活动小结</h3>
+      <div class="summary">${p.summary}</div>
+      <!-- 小结末尾的手绘波浪装饰线 -->
+      <svg class="summary-line" viewBox="0 0 120 8" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 2 5 Q 12 1, 24 5 T 46 5 T 68 5 T 90 5 T 118 4"
+              fill="none" stroke="#d8c9b4" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>`;
+
+  mask.classList.add("show");
+  panel.classList.add("show");
+  document.body.style.overflow = "hidden";  // 弹窗打开时锁定背景滚动
+}
+
+// 3. 关闭弹窗
+function closePanel() {
+  mask.classList.remove("show");
+  panel.classList.remove("show");
+  document.body.style.overflow = "";
+}
+document.getElementById("btnCloseX").addEventListener("click", closePanel);
+document.getElementById("btnClose").addEventListener("click", closePanel);
+mask.addEventListener("click", closePanel);
+</script>
+</body>
+</html>
